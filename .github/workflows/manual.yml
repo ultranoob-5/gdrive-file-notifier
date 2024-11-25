@@ -1,0 +1,48 @@
+name: Google Drive Monitor
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 */6 * * *'  # Runs every 6 hours
+env:
+    DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON_BASE64 }}
+
+jobs:
+  monitor_drive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Pull latest changes
+        run: |
+          git fetch origin
+          git pull origin main
+
+      - name: Run the script
+        run: |
+          python monitor_drive.py
+
+      - name: Commit changes to notified_files.json
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add notified_files.json
+          git commit -m "Update notified files"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
