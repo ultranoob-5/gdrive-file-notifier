@@ -63,8 +63,9 @@ def check_new_files(folder_id, notified_files):
     return new_files
 
 def notify_discord(file_name, file_id):
+    file_link = f"https://drive.google.com/file/d/{file_id}/view"
     message = {
-        "content": f"New file uploaded: **{file_name}**\nFile ID: `{file_id}`"
+        "content": f"New file uploaded: **{file_name}**\n[View File]({file_link})"
     }
     response = requests.post(DISCORD_WEBHOOK_URL, json=message)
     if response.status_code == 204:
