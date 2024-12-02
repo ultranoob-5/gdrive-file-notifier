@@ -62,10 +62,16 @@ def check_new_files(folder_id, notified_files):
     new_files = [file for file in files if file['id'] not in notified_files]
     return new_files
 
-def notify_discord(file_name, file_id):
-    file_link = f"https://drive.google.com/file/d/{file_id}/view"
+def notify_discord(item_name, item_id, mime_type):
+    if mime_type == "application/vnd.google-apps.folder":
+        link = f"https://drive.google.com/drive/folders/{item_id}"
+        item_type = "folder"
+    else:
+        link = f"https://drive.google.com/file/d/{item_id}/view"
+        item_type = "file"
+    
     message = {
-        "content": f"New file uploaded: **{file_name}**\n[View File]({file_link})"
+        "content": f"New {item_type} uploaded: **{item_name}**\n[View {item_type.capitalize()}]({link})"
     }
     response = requests.post(DISCORD_WEBHOOK_URL, json=message)
     if response.status_code == 204:
