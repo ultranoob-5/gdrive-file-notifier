@@ -56,13 +56,17 @@ def save_notified_files(notified_files):
         raise
 
 def check_new_files(folder_id, notified_files):
+    """Check for new files in the folder and return unsent files."""
     query = f"'{folder_id}' in parents and trashed = false"
-    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+    results = drive_service.files().list(
+        q=query, fields="files(id, name, mimeType, createdTime)"
+    ).execute()
     files = results.get('files', [])
     new_files = [file for file in files if file['id'] not in notified_files]
-    return new_files
+    return sorted(new_files, key=lambda x: x['createdTime'])
 
 def notify_discord(item_name, item_id, mime_type):
+    """Send a notification to Discord for a new file or folder."""
     if mime_type == "application/vnd.google-apps.folder":
         link = f"https://drive.google.com/drive/folders/{item_id}"
         item_type = "folder"
@@ -75,7 +79,7 @@ def notify_discord(item_name, item_id, mime_type):
     }
     response = requests.post(DISCORD_WEBHOOK_URL, json=message)
     if response.status_code == 204:
-        print(f"Successfully notified Discord about: {file_name}")
+        print(f"Successfully notified Discord about: {item_name}")
     else:
         print(f"Failed to notify Discord. Response: {response.text}")
 
@@ -90,7 +94,7 @@ if __name__ == "__main__":
     try:
         new_files = check_new_files(FOLDER_ID, notified_files)
         for file in new_files:
-            notify_discord(file['name'], file['id'])
+            notify_discord(file['name'], file['id'], file['mimeType'])
             notified_files.add(file['id'])
     finally:
         print("Saving notified files...")
