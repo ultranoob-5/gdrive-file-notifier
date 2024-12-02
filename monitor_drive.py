@@ -50,7 +50,7 @@ def load_notified_files():
 def save_notified_files(notified_files):
     try:
         with open(NOTIFIED_FILES_JSON, "w") as file:
-            json.dump(list(notified_files), file, indent=4)
+            json.dump(sorted(notified_files), file, indent=4)
     except Exception as e:
         print(f"Failed to save notified files: {e}")
         raise
