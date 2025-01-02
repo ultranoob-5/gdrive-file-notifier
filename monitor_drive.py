@@ -68,14 +68,28 @@ def check_new_files(folder_id, notified_files):
 def notify_discord(item_name, item_id, mime_type):
     """Send a notification to Discord for a new file or folder."""
     if mime_type == "application/vnd.google-apps.folder":
-        link = f"https://drive.google.com/drive/folders/{item_id}"
-        item_type = "folder"
+        view_link = f"https://drive.google.com/drive/folders/{item_id}"
+        download_link = view_link
+        item_type = "Folder"
+        emoji = "📁"
     else:
-        link = f"https://drive.google.com/file/d/{item_id}/view"
-        item_type = "file"
-    
+        view_link = f"https://drive.google.com/file/d/{item_id}/view"
+        download_link = f"https://drive.google.com/uc?id={item_id}&export=download"
+        item_type = "File"
+        emoji = "📄"
+
     message = {
-        "content": f"New {item_type} uploaded: **{item_name}**\n[View {item_type.capitalize()}]({link})"
+        "embeds": [
+            {
+                "title": f"{emoji} New {item_type} Uploaded",
+                "description": f"**{item_name}**",
+                "color": 0x5865F2,
+                "fields": [
+                    {"name": "🔗 View", "value": f"[Open {item_type}]({view_link})", "inline": True},
+                    {"name": "⬇️ Download", "value": f"[Download {item_type}]({download_link})", "inline": True}
+                ]
+            }
+        ]
     }
     response = requests.post(DISCORD_WEBHOOK_URL, json=message)
     if response.status_code == 204:
