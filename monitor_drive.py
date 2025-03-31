@@ -31,9 +31,22 @@ def load_config():
         raise FileNotFoundError(f"Config file '{CONFIG_FILE}' not found.")
     try:
         with open(CONFIG_FILE, "r") as file:
-            return json.load(file)
+            config = json.load(file)
+            folder_ids = config.get("folder_ids", [])
+            if not isinstance(folder_ids, list) or not folder_ids:
+                raise ValueError("Invalid 'folder_ids' in config file. It should be a non-empty list.")
+            return folder_ids
     except json.JSONDecodeError as e:
         raise ValueError(f"Error decoding JSON in config file: {e}")
+
+def get_folder_name(folder_id):
+    """Fetch and return the name of a Google Drive folder."""
+    try:
+        folder_metadata = drive_service.files().get(fileId=folder_id, fields="name").execute()
+        return folder_metadata.get("name", f"Unknown Folder ({folder_id})")
+    except Exception as e:
+        print(f"Error fetching folder name for {folder_id}: {e}")
+        return f"Unknown Folder ({folder_id})"
 
 # Load notified files from JSON
 def load_notified_files():
@@ -62,10 +75,9 @@ def check_new_files(folder_id, notified_files):
         q=query, fields="files(id, name, mimeType, createdTime)"
     ).execute()
     files = results.get('files', [])
-    new_files = [file for file in files if file['id'] not in notified_files]
-    return sorted(new_files, key=lambda x: x['createdTime'])
+    return [file for file in files if file['id'] not in notified_files]
 
-def notify_discord(item_name, item_id, mime_type):
+def notify_discord(item_name, item_id, mime_type, folder_name):
     """Send a notification to Discord for a new file or folder."""
     if mime_type == "application/vnd.google-apps.folder":
         view_link = f"https://drive.google.com/drive/folders/{item_id}"
@@ -81,7 +93,7 @@ def notify_discord(item_name, item_id, mime_type):
     message = {
         "embeds": [
             {
-                "title": f"{emoji} New {item_type} Uploaded",
+                "title": f"{emoji} New {item_type} Uploaded in **{folder_name}**",
                 "description": f"**{item_name}**",
                 "color": 0x5865F2,
                 "fields": [
@@ -98,18 +110,16 @@ def notify_discord(item_name, item_id, mime_type):
         print(f"Failed to notify Discord. Response: {response.text}")
 
 if __name__ == "__main__":
-    config = load_config()
-    FOLDER_ID = config.get("folder_id")
-    if not FOLDER_ID:
-        raise ValueError("Folder ID is missing in the configuration file.")
-
+    folder_ids = load_config()
     notified_files = load_notified_files()
 
     try:
-        new_files = check_new_files(FOLDER_ID, notified_files)
-        for file in new_files:
-            notify_discord(file['name'], file['id'], file['mimeType'])
-            notified_files.add(file['id'])
+        folder_names = {folder_id: get_folder_name(folder_id) for folder_id in folder_ids}  # Get all folder names
+        for folder_id in folder_ids:
+            new_files = check_new_files(folder_id, notified_files)
+            for file in new_files:
+                notify_discord(file['name'], file['id'], file['mimeType'], folder_names[folder_id])
+                notified_files.add(file['id'])
     finally:
         print("Saving notified files...")
         save_notified_files(notified_files)

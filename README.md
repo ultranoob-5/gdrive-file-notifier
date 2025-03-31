@@ -51,12 +51,15 @@ A Python-based tool to monitor Google Drive and send notifications to Discord us
    - Go to the "Actions" tab in your forked repository.
    - Enable workflows to automatically run the script.
 
-3. Adjust the folder ID in the configuration file:
+3. Adjust the folder ID's in the configuration file:
    - Open `config.json`.
-   - Update the `"folder_id"` field with the Google Drive folder ID you want to monitor.
+   - Update the `"folder_ids"` field with the Google Drive folder ID's you want to monitor.
 
    Example:
    ```json
    {
-       "folder_id": "your_google_drive_folder_id"
+       "folder_ids": [
+           "your_first_google_drive_folder_id",
+           "your_second_google_drive_folder_id"
+       ]
    }
