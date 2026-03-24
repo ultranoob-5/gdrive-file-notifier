@@ -1,106 +1,72 @@
-# Google Drive Notification Bot
-A Python-based tool to monitor Google Drive and send notifications to Discord using Google APIs and a Discord webhook.
+# Google Drive Discord Notifier
+
+A lightweight Google Apps Script that monitors Google Drive folders and sends
+real-time notifications to a Discord channel via webhook. No servers, no GitHub
+Actions, no API keys — runs entirely within Google's ecosystem for free.
 
 ## Features
-- Monitor Google Drive for changes like new files or updates.
-- Notify a Discord channel via webhook with detailed information.
-- Easily deployable through GitHub Actions.
-- Keyless authentication via Google Workload Identity Federation — no service account JSON keys required.
+- Monitors one or more Google Drive folders for new files and subfolders
+- Sends Discord notifications with view and download links
+- Runs every minute via a time-based trigger
+- Persists state via Apps Script Properties — no external storage needed
 
-## Installation
+## Prerequisites
+- A Google account with access to [Google Apps Script](https://script.google.com)
+- A Discord webhook URL ([how to create one](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks))
+- The Google Drive folder ID(s) you want to monitor
 
-### Prerequisites
+> **How to find your folder ID**: Open the folder in Google Drive. The ID is
+> the part of the URL after `/folders/`.
+> Example: `https://drive.google.com/drive/folders/1TzjJpTs...` → ID is `1TzjJpTs...`
 
-1. **Google Cloud Project**:
-   - Create or use an existing project in the [Google Cloud Console](https://console.cloud.google.com/).
-   - Enable the **Google Drive API**:
-```bash
-     gcloud services enable drive.googleapis.com
+## Setup
+
+### 1. Create a new Apps Script project
+- Go to [script.google.com](https://script.google.com)
+- Click **New Project**
+- Name it something like `G-Drive Discord Notifier`
+
+### 2. Add the code
+- Delete the default `myFunction()` placeholder
+- Copy and paste the contents of `Code.gs` into the editor
+
+### 3. Configure your settings
+At the top of the script, update these two values:
+```javascript
+const DISCORD_WEBHOOK_URL = "your_discord_webhook_url_here";
+const FOLDER_IDS = [
+  "your_google_drive_folder_id_here"
+];
+```
+To monitor multiple folders, add more IDs to the array:
+```javascript
+const FOLDER_IDS = [
+  "folder_id_one",
+  "folder_id_two"
+];
 ```
 
-2. **Google Cloud Setup (Workload Identity Federation)**:
+### 4. Run the initial setup
+- In the editor, select `checkNewFiles` from the function dropdown and click **Run**
+- This marks all existing files as already notified so you don't get spammed
+- Grant the requested permissions when prompted
 
-   Run the following commands in [Google Cloud Shell](https://shell.cloud.google.com/):
-
-   a. Create a service account:
-```bash
-   gcloud iam service-accounts create "gdrive-notify-sa" \
-     --display-name="GDrive Notify Service Account"
-```
-
-   b. Create a Workload Identity Pool:
-```bash
-   gcloud iam workload-identity-pools create "github-pool" \
-     --location="global" \
-     --display-name="GitHub Actions Pool"
-```
-
-   c. Create an OIDC provider (replace `YOUR_GITHUB_USERNAME/YOUR_REPO`):
-```bash
-   gcloud iam workload-identity-pools providers create-oidc "github-provider" \
-     --location="global" \
-     --workload-identity-pool="github-pool" \
-     --display-name="GitHub Provider" \
-     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-     --attribute-condition="assertion.repository=='YOUR_GITHUB_USERNAME/YOUR_REPO'" \
-     --issuer-uri="https://token.actions.githubusercontent.com"
-```
-
-   d. Bind the service account to the pool (replace `YOUR_PROJECT_NUMBER` and `YOUR_GITHUB_USERNAME/YOUR_REPO`):
-```bash
-   gcloud iam service-accounts add-iam-policy-binding "gdrive-notify-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-     --role="roles/iam.workloadIdentityUser" \
-     --member="principalSet://iam.googleapis.com/projects/YOUR_PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/YOUR_GITHUB_USERNAME/YOUR_REPO"
-```
-
-   e. Share the Google Drive folder with the service account:
-   - Open the folder in [Google Drive](https://drive.google.com).
-   - Click **Share** and add `gdrive-notify-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com` as a **Viewer**.
-
-3. **Discord Webhook**:
-   - Create a webhook in your desired Discord channel. Learn more [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks).
-
----
-
-### GitHub Setup
-
-1. Fork the repository:
-   - Click the **Fork** button at the top right corner of this repository.
-
-2. Add GitHub Secret:
-   - Navigate to **Settings > Secrets and variables > Actions > New repository secret**.
-   - Add the following secret:
-     - `DISCORD_WEBHOOK_URL`: Your Discord webhook URL.
-
-3. Update the workflow file (`.github/workflows/monitor.yml`):
-   - Replace `YOUR_PROJECT_NUMBER` and `YOUR_PROJECT_ID` with your actual GCP values:
-```yaml
-   - uses: google-github-actions/auth@v2
-     with:
-       workload_identity_provider: 'projects/YOUR_PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-       service_account: 'gdrive-notify-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com'
-```
-
-4. Enable GitHub Actions:
-   - Go to the **Actions** tab in your forked repository.
-   - Enable workflows to automatically run the script.
-
-5. Update `config.json` with the folder IDs you want to monitor:
-```json
-   {
-       "folder_ids": [
-           "your_first_google_drive_folder_id",
-           "your_second_google_drive_folder_id"
-       ]
-   }
-```
-   > The folder ID is the part of the Google Drive URL after `/folders/`.
-
----
+### 5. Create the trigger
+- Select `createTrigger` from the function dropdown and click **Run**
+- This sets up a 1-minute time-based trigger for `checkNewFiles`
+- Verify it was created under the **Triggers** tab (clock icon on the left)
 
 ## How It Works
-1. GitHub Actions runs the script on a schedule (every 6 hours) or on every push to `main`.
-2. The script authenticates to Google Cloud using Workload Identity Federation — no static keys involved.
-3. It checks the configured Drive folders for new files.
-4. Any new files are sent as Discord notifications via webhook.
-5. Notified file IDs are saved to `notified_files.json` and committed back to the repo to prevent duplicate notifications.
+1. Every minute, `checkNewFiles()` scans each configured folder
+2. File IDs are checked against previously notified IDs stored in Script Properties
+3. Any new file or subfolder triggers a Discord notification with view and download links
+4. The updated list of notified IDs is saved back to Script Properties
+
+## Limitations
+- Minimum trigger interval is 1 minute (Google Apps Script limitation)
+- Apps Script has a daily execution quota of 90 minutes/day on free accounts —
+  at ~2s per run, 1-minute triggers use roughly 48 minutes/day, well within limits
+- Does not monitor nested subfolders recursively (only direct children)
+
+## License
+MIT
