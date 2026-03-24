@@ -1,23 +1,14 @@
 import os
 import json
-import base64
 import requests
 from googleapiclient.discovery import build
-from google.oauth2.service_account import Credentials
+from google.auth import default
 
-# Get the base64 encoded service account JSON from the environment variable
+# Environment variables
 DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
-service_account_base64 = os.environ["SERVICE_ACCOUNT_JSON_BASE64"]
 
-# Decode the base64 string
-service_account_json = base64.b64decode(service_account_base64).decode("utf-8")
-
-# Parse the decoded JSON
-service_account_info = json.loads(service_account_json)
-
-# Load credentials and setup API
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
-credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+credentials, _ = default(scopes=SCOPES)
 drive_service = build('drive', 'v3', credentials=credentials)
 
 # JSON file for tracking notified files
@@ -48,7 +39,6 @@ def get_folder_name(folder_id):
         print(f"Error fetching folder name for {folder_id}: {e}")
         return f"Unknown Folder ({folder_id})"
 
-# Load notified files from JSON
 def load_notified_files():
     if not os.path.exists(NOTIFIED_FILES_JSON):
         return set()
@@ -59,7 +49,6 @@ def load_notified_files():
         print("Error decoding JSON. Resetting notified files.")
         return set()
 
-# Save notified files to JSON
 def save_notified_files(notified_files):
     try:
         with open(NOTIFIED_FILES_JSON, "w") as file:
@@ -114,7 +103,7 @@ if __name__ == "__main__":
     notified_files = load_notified_files()
 
     try:
-        folder_names = {folder_id: get_folder_name(folder_id) for folder_id in folder_ids}  # Get all folder names
+        folder_names = {folder_id: get_folder_name(folder_id) for folder_id in folder_ids}
         for folder_id in folder_ids:
             new_files = check_new_files(folder_id, notified_files)
             for file in new_files:

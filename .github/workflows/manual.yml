@@ -1,24 +1,30 @@
 name: Google Drive Monitor
-
 on:
   push:
     branches:
       - main
   schedule:
     - cron: '0 */6 * * *'  # Runs every 6 hours
+
 permissions:
   contents: write
+  id-token: write
+
 env:
-    DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-    SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.SERVICE_ACCOUNT_JSON_BASE64 }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
 jobs:
   monitor_drive:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/582242159658/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'gdrive-notify-sa@g-drive-491205.iam.gserviceaccount.com'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,8 +42,7 @@ jobs:
           git pull origin main
 
       - name: Run the script
-        run: |
-          python monitor_drive.py
+        run: python monitor_drive.py
 
       - name: Commit changes to notified_files.json
         run: |
