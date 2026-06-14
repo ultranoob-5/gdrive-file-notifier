@@ -17,20 +17,23 @@ function checkNewFiles() {
       const fileId = file.getId();
 
       if (!notifiedFiles.has(fileId)) {
-        notifyDiscord(file.getName(), fileId, file.getMimeType(), folderName);
-        notifiedFiles.add(fileId);
+        const success = notifyDiscord(file.getName(), fileId, file.getMimeType(), folderName);
+        if (success) {
+          notifiedFiles.add(fileId);
+        }
       }
     }
 
-    // Also check subfolders
     const subfolders = folder.getFolders();
     while (subfolders.hasNext()) {
       const subfolder = subfolders.next();
       const subfolderId = subfolder.getId();
 
       if (!notifiedFiles.has(subfolderId)) {
-        notifyDiscord(subfolder.getName(), subfolderId, "application/vnd.google-apps.folder", folderName);
-        notifiedFiles.add(subfolderId);
+        const success = notifyDiscord(subfolder.getName(), subfolderId, "application/vnd.google-apps.folder", folderName);
+        if (success) {
+          notifiedFiles.add(subfolderId);
+        }
       }
     }
   }
@@ -61,13 +64,36 @@ function notifyDiscord(itemName, itemId, mimeType, folderName) {
     }]
   };
 
-  UrlFetchApp.fetch(DISCORD_WEBHOOK_URL, {
+  const response = UrlFetchApp.fetch(DISCORD_WEBHOOK_URL, {
     method: "post",
     contentType: "application/json",
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
   });
 
-  Logger.log(`Notified Discord: ${itemName}`);
+  const responseCode = response.getResponseCode();
+
+  if (responseCode === 429) {
+    const responseData = JSON.parse(response.getContentText());    
+    const retryAfterSeconds = responseData.retry_after || 5;     
+    const waitTimeMs = (retryAfterSeconds * 1000) + 500; 
+
+    Logger.log(`Rate limited! Discord requested a pause of ${retryAfterSeconds}s. Sleeping for ${waitTimeMs}ms. Skipping "${itemName}" until the next run.`);
+    
+    Utilities.sleep(waitTimeMs); 
+    
+    return false;
+
+  } else if (responseCode >= 200 && responseCode < 300) {
+    Logger.log(`Notified Discord: ${itemName}`);
+    
+    Utilities.sleep(1000); 
+    return true; 
+    
+  } else {
+    Logger.log(`Failed to notify "${itemName}". Error code: ${responseCode}. Response: ${response.getContentText()}`);
+    return false;
+  }
 }
 
 function createTrigger() {
